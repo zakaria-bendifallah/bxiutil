@@ -48,6 +48,7 @@ static void _destroy_key();
 // ********************************** Global Variables *****************************
 // *********************************************************************************
 SET_LOGGER(BXIRNG_LOGGER, BXILOG_LIB_PREFIX "bxiutil.rng");
+SET_LOGGER(CINSTRU_RNG_LOGGER, "CINSTRU.bxiutil.rng");
 
 static pthread_key_t RND_KEY;
 static pthread_once_t RND_KEY_ONCE = PTHREAD_ONCE_INIT;
@@ -58,6 +59,7 @@ static pthread_once_t RND_KEY_ONCE = PTHREAD_ONCE_INIT;
 // *********************************************************************************
 
 uint32_t bxirng_new_seed() {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     errno = 0;
     int fd = open(RANDOM_GEN_FILE, O_RDONLY);
     if (-1 == fd) {
@@ -78,6 +80,7 @@ uint32_t bxirng_new_seed() {
     if (-1 == rc) {
         WARNING(BXIRNG_LOGGER, "Can't close() '%s'", RANDOM_GEN_FILE);
     }
+    TRACE(CINSTRU_RNG_LOGGER,"X");
     return seed;
 }
 
@@ -87,9 +90,11 @@ uint32_t bxirng_new_seed() {
  * Return a new random number generator.
  */
 bxirng_p bxirng_new(uint32_t seed) {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     bxirng_p self = bximem_calloc(sizeof(*self));
     _init_rng(self, seed);
 
+    TRACE(CINSTRU_RNG_LOGGER,"X");
     return self;
 }
 
@@ -97,7 +102,9 @@ bxirng_p bxirng_new(uint32_t seed) {
  * Free all allocated ressources and nullify the given pointer.
  */
 void bxirng_destroy(bxirng_p * rng_p) {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     BXIFREE(*rng_p);
+    TRACE(CINSTRU_RNG_LOGGER,"X");
 }
 
 /*
@@ -105,6 +112,7 @@ void bxirng_destroy(bxirng_p * rng_p) {
  * [start, end[. Note that 'start' is included and 'end' is excluded.
  */
 uint32_t bxirng_nextint(bxirng_p self, uint32_t start, uint32_t end) {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     BXIASSERT(BXIRNG_LOGGER, start < end);
     uint32_t n = end - start;
     uint32_t x;
@@ -113,10 +121,12 @@ uint32_t bxirng_nextint(bxirng_p self, uint32_t start, uint32_t end) {
         x = (uint32_t) rand_r(&self->seed);
     } while(x >= RAND_MAX - n && x >= n);
 
+    TRACE(CINSTRU_RNG_LOGGER,"X");
     return (uint32_t) (x % n + start);
 }
 
 uint32_t bxirng_nextint_tsd(uint32_t start, uint32_t end) {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     pthread_once(&RND_KEY_ONCE, _rng_key_maker);
     bxirng_p rng = pthread_getspecific(RND_KEY);
     if (rng == NULL) {
@@ -129,10 +139,12 @@ uint32_t bxirng_nextint_tsd(uint32_t start, uint32_t end) {
         }
         TRACE(BXIRNG_LOGGER, "Allocation of a new TSD rng: %p", rng);
     }
+    TRACE(CINSTRU_RNG_LOGGER,"X");
     return bxirng_nextint(rng, start, end);
 }
 
 void bxirng_new_rngs(uint32_t seed, size_t n, bxirng_s ** rngs_p) {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     BXIASSERT(BXIRNG_LOGGER, NULL != rngs_p && 0 < n);
     if (NULL == *rngs_p) {
         *rngs_p = bximem_calloc(n * sizeof(**rngs_p));
@@ -144,6 +156,7 @@ void bxirng_new_rngs(uint32_t seed, size_t n, bxirng_s ** rngs_p) {
         _init_rng(rngs + i, i_seed);
     }
     bxirng_destroy(&rng);
+    TRACE(CINSTRU_RNG_LOGGER,"X");
 }
 
 // *********************************************************************************
@@ -151,17 +164,22 @@ void bxirng_new_rngs(uint32_t seed, size_t n, bxirng_s ** rngs_p) {
 // *********************************************************************************
 
 void _init_rng(bxirng_p self, uint32_t seed) {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     TRACE(BXIRNG_LOGGER, "Setting seed: %u for rng: %p", seed, self);
     self->seed = seed;
+    TRACE(CINSTRU_RNG_LOGGER,"X");
 }
 
 void _destroy_key() {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     bxirng_p rng = (bxirng_p) pthread_getspecific(RND_KEY);
     bxirng_destroy(&rng);
     pthread_key_delete(RND_KEY);
+    TRACE(CINSTRU_RNG_LOGGER,"X");
 }
 
 void _rng_key_maker() {
+    TRACE(CINSTRU_RNG_LOGGER,"E");
     int rc = pthread_key_create(&RND_KEY, free);
     if (rc != 0) {
         BXIEXIT(EX_OSERR,
@@ -176,4 +194,5 @@ void _rng_key_maker() {
                 BXIRNG_LOGGER, BXILOG_CRITICAL);
 
     }
+    TRACE(CINSTRU_RNG_LOGGER,"X");
 }

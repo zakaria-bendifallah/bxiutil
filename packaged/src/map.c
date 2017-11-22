@@ -107,6 +107,7 @@ static bxierr_p _fill_vector_with_cpu(intptr_t first_cpu, intptr_t last_cpu,
 
 
 SET_LOGGER(MAPPER_LOGGER, BXILOG_LIB_PREFIX "bxiutil.map");
+SET_LOGGER(CINSTRU_MAP_LOGGER, "CINSTRU.bxiutil.map");
 pthread_once_t mapper_once_control = PTHREAD_ONCE_INIT;
 
 
@@ -156,6 +157,7 @@ bxierr_p bximap_new(size_t start,
                     void * usr_data,
                     bximap_ctx_p * task_p){
 
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     bxiassert(NULL != task_p);
     bxiassert(start <= end && NULL != func);
 
@@ -166,10 +168,12 @@ bxierr_p bximap_new(size_t start,
     task->func = func;
     task->granularity = granularity;
     task->usr_data = usr_data;
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return BXIERR_OK;
 }
 
 bxierr_p bximap_destroy(bximap_ctx_p *ctx) {
+    TRACE(CINSTRU_MAP_LOGGER,"E");
 
     for (size_t i = 0; i < (*ctx)->next_error; i++) {
         bxierr_p err = (*ctx)->tasks_error[i];
@@ -177,29 +181,35 @@ bxierr_p bximap_destroy(bximap_ctx_p *ctx) {
     }
     BXIFREE((*ctx)->tasks_error);
     BXIFREE(*ctx);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return BXIERR_OK;
 }
 
 bxierr_p bximap_get_error(bximap_ctx_p context, size_t *n, bxierr_p **err_p) {
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     bxiassert(NULL != context);
     bxiassert(NULL != n  && NULL != err_p);
 
     *n = context->next_error;
     if (*n != 0) *err_p = context->tasks_error;
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return BXIERR_OK;
 }
 
 /* execute the work describe by the context */
 bxierr_p bximap_execute(bximap_ctx_p context){
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     int rc = 0;
     UNUSED(rc);
     bxiassert(NULL != context);
 
     if (shared_info.state != MAPPER_INITIALIZED) {
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return bxierr_simple(BXIMAP_NOT_INITIALIZED, NOT_INITIALIZED_MSG);
     }
 
     if(shared_info.global_task != &last_task && shared_info.global_task != NULL){
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return bxierr_new(BXIMAP_RUNNING,
                           NULL, NULL, NULL, NULL,
                           RUNNING_MSG);
@@ -420,6 +430,7 @@ bxierr_p bximap_execute(bximap_ctx_p context){
 
     shared_info.global_task = NULL;
     BXIFREE(shared_info.tasks);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return err;
 }
 
@@ -430,7 +441,9 @@ bxierr_p bximap_execute(bximap_ctx_p context){
  *      the number of physical cpu will be used
  */
 bxierr_p bximap_init(size_t * nb_threads){
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     if (shared_info.state == MAPPER_INITIALIZED) {
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return bxierr_simple(BXIMAP_INITIALIZE, INITIALIZE_MSG);
     }
     size_t thr_nb = nb_threads == NULL ? 0 : *nb_threads;
@@ -451,7 +464,10 @@ bxierr_p bximap_init(size_t * nb_threads){
         if (nb_threads_s != NULL){
             bxierr_p err2 = bximisc_strtol(nb_threads_s, 10, &sys_cpu);
             BXIERR_CHAIN(err, err2);
-            if (bxierr_isko(err)) return err;
+            if (bxierr_isko(err)){
+                TRACE(CINSTRU_MAP_LOGGER,"X");
+                return err;
+            }
             TRACE(MAPPER_LOGGER,
                   "Mapper getenv returned: %s, bximisc_strtol: %ld",
                   nb_threads_s, sys_cpu);
@@ -576,13 +592,16 @@ bxierr_p bximap_init(size_t * nb_threads){
     err2 = bxitime_duration(CLOCK_MONOTONIC, creation_time, &duration);
     BXIERR_CHAIN(err, err2);
     INFO(MAPPER_LOGGER, "Map initialization %f seconds", duration);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return err;
 }
 
 /* clean properly the threads and liberate the memory */
 bxierr_p bximap_finalize(){
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     int rc = 0;
     if(shared_info.state != MAPPER_INITIALIZED) {
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return bxierr_simple(BXIMAP_NOT_INITIALIZED, NOT_INITIALIZED_MSG);
     }
     struct timespec stop_time;
@@ -705,6 +724,7 @@ bxierr_p bximap_finalize(){
     bxitime_duration(CLOCK_MONOTONIC, stop_time, &duration);
     BXIERR_CHAIN(err, err2);
     INFO(MAPPER_LOGGER, "Map stop %f seconds", duration);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return BXIERR_OK;
 }
 
@@ -715,12 +735,15 @@ bxierr_p bximap_on_cpu(size_t cpu) {
     CPU_SET(cpu, &cpu_mask);
     errno = 0;
     if (sched_setaffinity(0, 1, &cpu_mask) != 0) {
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return bxierr_errno("Process binding on the cpu failled (sched_setaffinity)");
     }
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return BXIERR_OK;
 }
 
 bxierr_p bximap_translate_cpumask(const char * cpus, bxivector_p * vcpus) {
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     BXIASSERT(MAPPER_LOGGER, vcpus != NULL);
 
     *vcpus = bxivector_new(0, NULL);
@@ -734,10 +757,12 @@ bxierr_p bximap_translate_cpumask(const char * cpus, bxivector_p * vcpus) {
         cpu = strtol(int_str, &next_int, 10);
         if (0 != errno) {
             bxivector_destroy(vcpus, NULL);
+            TRACE(CINSTRU_MAP_LOGGER,"X");
             return bxierr_errno("Error while parsing number: '%s'", int_str);
         }
         if (next_int == int_str) {
             bxivector_destroy(vcpus, NULL);
+            TRACE(CINSTRU_MAP_LOGGER,"X");
             return bxierr_new(BXIMISC_NODIGITS_ERR,
                               strdup(int_str),
                               free,
@@ -753,6 +778,7 @@ bxierr_p bximap_translate_cpumask(const char * cpus, bxivector_p * vcpus) {
         } else {
             if (cpu < 0) {
                 bxivector_destroy(vcpus, NULL);
+                TRACE(CINSTRU_MAP_LOGGER,"X");
                 return bxierr_new(BXIMAP_NEGATIVE_INTEGER, strdup(int_str),
                                   free, NULL, NULL, "Negative cpu number found %s",
                                   int_str);
@@ -761,23 +787,28 @@ bxierr_p bximap_translate_cpumask(const char * cpus, bxivector_p * vcpus) {
             bxierr_p err = _fill_vector_with_cpu(previous_cpu, cpu, *vcpus);
             if (bxierr_isko(err)) {
                 bxivector_destroy(vcpus, NULL);
+                TRACE(CINSTRU_MAP_LOGGER,"X");
                 return err;
             }
             previous_cpu = -1;
         }
     }
 
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return BXIERR_OK;
 }
 
 bxierr_p bximap_set_cpumask(char * cpus) {
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     if (shared_info.state == MAPPER_INITIALIZED) {
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return bxierr_simple(BXIMAP_INITIALIZE, INITIALIZE_MSG);
     }
     if (cpus == NULL || strcmp(cpus, "") == 0) {
         if (vcpus != NULL) {
             bxivector_destroy(&vcpus, NULL);
         }
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return BXIERR_OK;
     }
 
@@ -802,6 +833,7 @@ bxierr_p bximap_set_cpumask(char * cpus) {
         }
     }
 
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return err;
 }
 
@@ -810,36 +842,48 @@ bxierr_p bximap_set_cpumask(char * cpus) {
 // *********************************************************************************
 
 void _mapper_parent_before_fork(void) {
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     TRACE(MAPPER_LOGGER, "%s state:%d", __func__, shared_info.state);
     bxierr_p err = bximap_finalize();
     if (BXIMAP_NOT_INITIALIZED != err->code) {
         shared_info.state = MAPPER_FORKED;
     }
+    TRACE(CINSTRU_MAP_LOGGER,"X");
 }
 void _mapper_once(void){
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     TRACE(MAPPER_LOGGER, "%s state:%d", __func__, shared_info.state);
     pthread_atfork(_mapper_parent_before_fork, _mapper_parent_after_fork, NULL);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
 }
 void _mapper_parent_after_fork(void) {
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     TRACE(MAPPER_LOGGER, "%s state:%d", __func__, shared_info.state);
-    if (shared_info.state != MAPPER_FORKED) return;
+    if (shared_info.state != MAPPER_FORKED){
+        TRACE(CINSTRU_MAP_LOGGER,"X");
+        return;
+    }
     shared_info.state = MAPPER_FOLLOW_FORKED;
     TRACE(MAPPER_LOGGER, "%s state:%d call init thread", __func__, shared_info.state);
     bxierr_p rc = bximap_init(0);
     BXIASSERT(MAPPER_LOGGER, rc == BXIERR_OK);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
 }
 
 
 
 bxierr_p _do_job(bximap_ctx_p task, size_t thread_id){
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     size_t start = task->start;
     size_t end = task->end ;
     TRACE(MAPPER_LOGGER, "start %zu, end %zu, thread_id %zu", start, end, thread_id);
     bxierr_p err = task->func(start, end, thread_id, task->usr_data);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return err;
 }
 
 void * __start_function(void* arg){
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     size_t thread_id = *(size_t*) arg;
     bximap_ctx_p current_task = NULL;
     bxierr_p err = BXIERR_OK, err2;
@@ -937,6 +981,7 @@ void * __start_function(void* arg){
         int rc = zmq_poll(items, 2, -1); // -1 -> wait infinitely
         if (rc == -1) {
             if(zmq_errno() == EINTR) continue;
+            TRACE(CINSTRU_MAP_LOGGER,"X");
             return bxierr_errno("Calling zmq_poll failed.");
         }
         if (items [0].revents & ZMQ_POLLIN) {
@@ -944,6 +989,7 @@ void * __start_function(void* arg){
             errno = 0;
             int rc = zmq_msg_init(&zmsg);
             if (rc == -1) {
+                TRACE(CINSTRU_MAP_LOGGER,"X");
                 return bxierr_errno("Calling zmq_msg_init() failed.");
             }
 
@@ -953,6 +999,7 @@ void * __start_function(void* arg){
                     rc = zmq_msg_recv(&zmsg, zocket_pull_tasks, 0);
                 }
                 if (rc == -1) {
+                    TRACE(CINSTRU_MAP_LOGGER,"X");
                     return bxierr_errno("Can't receive a msg through zsocket: %p",
                                         zocket_pull_tasks);
                 }
@@ -1048,25 +1095,30 @@ void * __start_function(void* arg){
     BXIERR_CHAIN(err, err2);
 #endif
     TRACE(MAPPER_LOGGER, "thread:%zu stop", thread_id);
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return err;
 }
 
 void * _start_function(void* arg){
+   TRACE(CINSTRU_MAP_LOGGER,"E");
    bxierr_p  err = __start_function(arg);
    if (bxierr_isko(err)) {
        BXILOG_REPORT(MAPPER_LOGGER, BXILOG_WARNING, err, "Error");
    }
     size_t thread_id = *(size_t*) arg;
     TRACE(MAPPER_LOGGER, "thread:%zu stop", thread_id);
+   TRACE(CINSTRU_MAP_LOGGER,"X");
    return err;
 }
 
 
 
 bxierr_p _fill_vector_with_cpu(intptr_t first_cpu, intptr_t last_cpu, bxivector_p vcpus) {
+    TRACE(CINSTRU_MAP_LOGGER,"E");
     TRACE(MAPPER_LOGGER, "first_cpu=\"%zd\" last_cpu=\"%zd\"",
           first_cpu, last_cpu);
     if (first_cpu > last_cpu) {
+        TRACE(CINSTRU_MAP_LOGGER,"X");
         return bxierr_new(BXIMAP_INTERVAL_ERROR, NULL, NULL, NULL, NULL,
                           "Interval with a greater first index %zu than last index %zu",
                           first_cpu, last_cpu);
@@ -1075,5 +1127,6 @@ bxierr_p _fill_vector_with_cpu(intptr_t first_cpu, intptr_t last_cpu, bxivector_
     for (intptr_t i = first_cpu; i <= last_cpu; i++) {
         bxivector_push(vcpus, (void *) i);
     }
+    TRACE(CINSTRU_MAP_LOGGER,"X");
     return BXIERR_OK;
 }

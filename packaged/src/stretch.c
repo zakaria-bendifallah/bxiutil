@@ -41,6 +41,7 @@ typedef struct bxistretch_s_t {
 // *********************************************************************************
 
 SET_LOGGER(STRETCH_C_LOGGER, BXILOG_LIB_PREFIX "bxiutil.stretch");
+SET_LOGGER(CINSTRU_LOGGER, "CINSTRU.bxiutil.stretch");
 
 
 // *********************************************************************************
@@ -51,6 +52,7 @@ bxistretch_p bxistretch_new(size_t chunk_size,
                             size_t  element_size,
                             size_t element_nb) {
 
+    TRACE(CINSTRU_LOGGER,"E");
     bxistretch_p self = bximem_calloc(sizeof(*self));
     self->array_size = BXISTRETCH_ARRAY_SIZE;
     self->element_nb = 0;
@@ -61,28 +63,40 @@ bxistretch_p bxistretch_new(size_t chunk_size,
     self->chunk_nb = 0;
     if (element_nb > 1) bxistretch_hit(self, element_nb - 1);
 
+    TRACE(CINSTRU_LOGGER,"X");
     return self;
 }
 
 void bxistretch_destroy(bxistretch_p *self_p) {
-    if (NULL == self_p) return;
+    TRACE(CINSTRU_LOGGER,"E");
+    if (NULL == self_p){
+        TRACE(CINSTRU_LOGGER,"X");
+        return;
+    }
     bxistretch_p self = *self_p;
     for (size_t i = 0; i < self->chunk_nb; i++) {
         BXIFREE(self->biarray[i]);
     }
     BXIFREE(self->biarray);
     BXIFREE(*self_p);
+    TRACE(CINSTRU_LOGGER,"X");
 }
 
 void * bxistretch_get(bxistretch_p self, size_t index) {
+    TRACE(CINSTRU_LOGGER,"E");
     size_t chunk_requested = ((index + self->chunk_size) / self->chunk_size) - 1;
     size_t position = index - chunk_requested * self->chunk_size;
-    if (self->element_nb <= index) return NULL;
+    if (self->element_nb <= index){
+        TRACE(CINSTRU_LOGGER,"X");
+        return NULL;
+    }
+    TRACE(CINSTRU_LOGGER,"X");
     return (void*)(uintptr_t)(self->biarray[chunk_requested] + position * self->element_size);
 }
 
 void * bxistretch_hit(bxistretch_p self, size_t index) {
 
+    TRACE(CINSTRU_LOGGER,"E");
     if (self->element_nb <= index) {
 
         size_t previously_chunk_nb = self->chunk_nb;
@@ -102,6 +116,7 @@ void * bxistretch_hit(bxistretch_p self, size_t index) {
         self->element_nb = index + 1;
     }
 
+    TRACE(CINSTRU_LOGGER,"X");
     return bxistretch_get(self, index);
 }
 

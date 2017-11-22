@@ -69,24 +69,31 @@ static bxierr_p _create_writable_file(const char * filename, size_t size, int *f
 // ********************************** Global Variables *****************************
 // *********************************************************************************
 SET_LOGGER(BXIMISC_LOGGER, BXILOG_LIB_PREFIX "bxiutil.misc");
+SET_LOGGER(CINSTRU_MISC_LOGGER, "CINSTRU.bxiutils.misc");
 // *********************************************************************************
 // ********************************** Implementation   *****************************
 // *********************************************************************************
 
 bxierr_p bximisc_get_filename(FILE * const stream, char ** filename) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, NULL != stream && NULL != filename);
     errno = 0;
     const int fd = fileno(stream);
-    if (-1 == fd) return bxierr_errno("Bad stream: %x", stream);
+    if (-1 == fd){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return bxierr_errno("Bad stream: %x", stream);
+    }
     char * path = bxistr_new("/proc/self/fd/%d", fd);
 
     *filename = bximisc_readlink(path);
 
     BXIFREE(path);
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
 char * bximisc_readlink(const char * const linkname) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     struct stat sb;
     errno = 0;
     if (lstat(linkname, &sb) == -1) {
@@ -104,9 +111,11 @@ char * bximisc_readlink(const char * const linkname) {
         if (r < 0) {
             BXIFREE(targetname);
             if (errno != EINVAL) {
+                TRACE(CINSTRU_MISC_LOGGER,"X");
                 return NULL;
             }
             // EINVAL means the linkname is actually not a link: return the original name
+            TRACE(CINSTRU_MISC_LOGGER,"X");
             return strdup(linkname);
         }
         if ((size_t) r < n) {
@@ -117,19 +126,30 @@ char * bximisc_readlink(const char * const linkname) {
         old_size = n;
         n *= 2;
     }
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return targetname;
 }
 
 char * bximisc_abs_readlink(const char * const linkname) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, NULL != linkname);
 
     char * link = bximisc_readlink(linkname);
-    if (NULL == link) return link;
-    if ('/' == link[0]) return link;
+    if (NULL == link){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return link;
+    }
+    if ('/' == link[0]){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return link;
+    }
 
     // Relative path returned, try to compute the path from the linkname given.
     char * found = strrchr(linkname, '/');
-    if (NULL == found) return link;
+    if (NULL == found){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return link;
+    }
 
     size_t dirname_len = (size_t) (found - linkname);
     size_t link_len = strlen(link);
@@ -139,6 +159,7 @@ char * bximisc_abs_readlink(const char * const linkname) {
     result[dirname_len] = '/';
     memcpy(result + dirname_len + 1, link, link_len);
 
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return result;
 }
 
@@ -148,15 +169,20 @@ char * bximisc_tuple_str(const size_t n,
                          const char prefix,
                          const char sep,
                          const char suffix) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     // 2 digits * n tuples + 1 * sep * n tuples + prefix + suffix + '\0'
     size_t size = n * 2 + n + 2 + 1;
 
     char * p = bximem_calloc(size);
-    if (p == NULL ) return NULL ;
+    if (p == NULL ){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return NULL ;
+    }
     if (n == 0) {
         *p = prefix;
         *(p + 1) = suffix;
         *(p + 2) = '\0';
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return (p);
     }
     char * next = p;
@@ -206,12 +232,14 @@ char * bximisc_tuple_str(const size_t n,
     char * np = (char *) realloc(p, (size_t) size);
     if (!np) {
         free(p);
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return (NULL);
     }
     p = np;
     next = p + written;
     written = 0;
     }
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return (p);
 }
 
@@ -220,6 +248,7 @@ bxierr_p bximisc_str_tuple(const char * start, char * end,
                            uint8_t * const dim,
                            uint8_t * const result) {
 
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, start != NULL && end != NULL);
     BXIASSERT(BXIMISC_LOGGER, result != NULL && dim != NULL);
 
@@ -255,12 +284,14 @@ bxierr_p bximisc_str_tuple(const char * start, char * end,
                 *dim = 0;
                 bxierr_destroy(&err);
                 BXIFREE(original_str);
+                TRACE(CINSTRU_MISC_LOGGER,"X");
                 return BXIERR_OK;
             }
             if (BXIMISC_REMAINING_CHAR == err->code) { // The whole string contains sep
                 const char * comma = (char *) err->data;
 
                 if (*comma != sep && *comma != suffix) {
+                    TRACE(CINSTRU_MISC_LOGGER,"X");
                     return  bxierr_new(340, original_str, free, NULL, err,
                                        "Bad char '%c', expecting '%c' or '%c' in '%s'",
                                        *comma, sep, suffix, original_str);
@@ -268,13 +299,17 @@ bxierr_p bximisc_str_tuple(const char * start, char * end,
                 bxierr_destroy(&err);
                 // Next character
                 start = comma + 1;
-            } else return  bxierr_new(340, original_str, free, NULL, err,
+            } else{
+                TRACE(CINSTRU_MISC_LOGGER,"X");
+                return  bxierr_new(340, original_str, free, NULL, err,
                                       "Calling bximisc_strtoul() "
                                       "failed with string '%s'",
                                       original_str);
+            }
         } else start = end + 1; // The whole string is a digit.
         /* If we got here, strtoul() successfully parsed a number */
         if (val > UINT8_MAX) {
+            TRACE(CINSTRU_MISC_LOGGER,"X");
             return bxierr_new(340,
                               original_str, free,
                               NULL ,
@@ -287,6 +322,7 @@ bxierr_p bximisc_str_tuple(const char * start, char * end,
     }
     *dim = (uint8_t) tmp_dim;
     BXIFREE(original_str);
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
@@ -352,6 +388,7 @@ uint32_t bximisc_crc32(uint32_t inCrc32, const void *buf, size_t bufLen) {
 }
 
 char * bximisc_get_ip(char * hostname) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     struct addrinfo hints, *info, *p;
     char tmp[255]; // Should be in this scope for hostname to point towards it.
 
@@ -396,24 +433,33 @@ char * bximisc_get_ip(char * hostname) {
                 inet_ntoa(addr->sin_addr));
     }
     freeaddrinfo(info);
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return (result);
 }
 
 bxierr_p bximisc_strtoul(const char * const str,
                          const int base,
                          unsigned long * const result) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     errno = 0;
     char * endptr;
     *result = strtoul(str, &endptr, base);
-    if (0 != errno) return bxierr_errno("Error while parsing number: '%s'", str);
-    if (endptr == str) return bxierr_new(BXIMISC_NODIGITS_ERR,
+    if (0 != errno){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return bxierr_errno("Error while parsing number: '%s'", str);
+    }
+    if (endptr == str){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return bxierr_new(BXIMISC_NODIGITS_ERR,
                                          strdup(str),
                                          free,
                                          NULL ,
                                          NULL,
                                          "No digit found in '%s'",
                                          str);
+    }
     if (*endptr != '\0') {
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return bxierr_new(BXIMISC_REMAINING_CHAR,
                           endptr,
                           NULL,
@@ -421,23 +467,32 @@ bxierr_p bximisc_strtoul(const char * const str,
                           NULL,
                           "Some non digits characters remain in string '%s'", str);
     }
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
 
 bxierr_p bximisc_strtol(const char * const str, const int base, long * result) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     errno = 0;
     char * endptr;
     *result = strtol(str, &endptr, base);
-    if (0 != errno) return bxierr_errno("Error while parsing number: '%s'", str);
-    if (endptr == str) return bxierr_new(BXIMISC_NODIGITS_ERR,
+    if (0 != errno){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return bxierr_errno("Error while parsing number: '%s'", str);
+    }
+    if (endptr == str){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
+        return bxierr_new(BXIMISC_NODIGITS_ERR,
                                          strdup(str),
                                          free,
                                          NULL ,
                                          NULL,
                                          "No digit found in '%s'",
                                          str);
+    }
     if (*endptr != '\0') {
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return bxierr_new(BXIMISC_REMAINING_CHAR,
                           endptr,
                           NULL,
@@ -445,6 +500,7 @@ bxierr_p bximisc_strtol(const char * const str, const int base, long * result) {
                           NULL,
                           "Some non digits characters remain in string '%s'", str);
     }
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
@@ -455,6 +511,7 @@ char * bximisc_bitarray_str(const char * const bitarray, const uint64_t n,
                             const char *separator,
                             const char *suffix) {
 
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     assert(bitarray != NULL && n < UNKNOWN_LAST);
     // Create the line for printing
     char * line = NULL;
@@ -489,10 +546,12 @@ char * bximisc_bitarray_str(const char * const bitarray, const uint64_t n,
     if (last != UNKNOWN_LAST && !hole) fprintf(fd, "-%lu", (unsigned long)last);
     fprintf(fd, "%s", suffix);
     fclose(fd);
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return line;
 }
 
 void bximisc_stats(size_t n, uint32_t *data, bximisc_stats_s * stats_p) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     assert(NULL != stats_p);
     uint32_t tmp = 0;
     stats_p->min = UINT32_MAX;
@@ -508,25 +567,30 @@ void bximisc_stats(size_t n, uint32_t *data, bximisc_stats_s * stats_p) {
         tmp2 += ((double) data[i]-stats_p->mean)*((double) data[i]-stats_p->mean);
     }
     stats_p->stddev = sqrt((double) tmp2 / (double)n);
+    TRACE(CINSTRU_MISC_LOGGER,"X");
 }
 
 
 
 bxierr_p bximisc_file_size(const char *filename, size_t * size) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, size != NULL);
     struct stat st;
     errno = 0;
 
     if (stat(filename, &st) == 0) {
         *size = (size_t)st.st_size;
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return BXIERR_OK;
     }
 
     bxierr_p err = bxierr_errno("An error occured while getting stat of file %s.", filename);
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return err;
 }
 
 bxierr_p bximisc_mkdir(const char* const foldername) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, NULL != foldername);
     TRACE(BXIMISC_LOGGER, "Creating %s", foldername);
     struct stat buf;
@@ -540,18 +604,22 @@ bxierr_p bximisc_mkdir(const char* const foldername) {
             rc = stat(foldername, &buf);
             if (rc == -1) {
                 bxierr_p bxierr = bxierr_errno("Calling stat() failed %s", foldername);
+                TRACE(CINSTRU_MISC_LOGGER,"X");
                 return bxierr;
             }
         } else {
           bxierr_p bxierr = bxierr_errno("Can't create %s", foldername);
+          TRACE(CINSTRU_MISC_LOGGER,"X");
           return bxierr;
 
         }
     }
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
 bxierr_p bximisc_mkdirs(const char* const foldername) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, NULL != foldername);
     struct stat buf;
     errno = 0;
@@ -559,6 +627,7 @@ bxierr_p bximisc_mkdirs(const char* const foldername) {
     if (rc == -1) {
         if (errno != ENOENT) { // All other errors are critical
           bxierr_p bxierr = bxierr_errno("Calling stat() failed on %s", foldername);
+          TRACE(CINSTRU_MISC_LOGGER,"X");
           return bxierr;
         }
 
@@ -569,9 +638,11 @@ bxierr_p bximisc_mkdirs(const char* const foldername) {
           bxierr_p bxierr = bxierr_errno("Can't create '%s': name already exists and "
                                           "is not a directory. Aborting.",
                                           foldername);
+          TRACE(CINSTRU_MISC_LOGGER,"X");
           return bxierr;
 
         } else {
+            TRACE(CINSTRU_MISC_LOGGER,"X");
             return BXIERR_OK;
         }
     }
@@ -581,10 +652,12 @@ bxierr_p bximisc_mkdirs(const char* const foldername) {
     if(strcmp(dir, "/") != 0 && strcmp(dir, ".") != 0){
         bxierr_p err = bximisc_mkdirs(dir);
         if (err != BXIERR_OK) {
+          TRACE(CINSTRU_MISC_LOGGER,"X");
           return err;
         }
     }
     BXIFREE(subdir);
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return bximisc_mkdir(foldername);
 }
 
@@ -594,6 +667,7 @@ bxierr_p bximisc_file_map(const char * filename,
                           bool link_onfile,
                           int MMAP_PROT,
                           char ** addr){
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, addr != NULL);
 
     int file = -1;
@@ -607,11 +681,15 @@ bxierr_p bximisc_file_map(const char * filename,
         BXIASSERT(BXIMISC_LOGGER, NULL != filename);
         if (load) {
             if (filename == NULL) {
+                TRACE(CINSTRU_MISC_LOGGER,"X");
                 return bxierr_gen("Can't load a file without its name");
             }
             errno = 0;
             file = open(filename, O_RDONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-            if (file == -1) return bxierr_errno("Can't open %s", filename);
+            if (file == -1){
+                TRACE(CINSTRU_MISC_LOGGER,"X");
+                return bxierr_errno("Can't open %s", filename);
+            }
             errno = 0;
             init_file_addr = mmap(NULL, size, MMAP_PROT,
                                   MAP_PRIVATE, file, 0);
@@ -619,7 +697,10 @@ bxierr_p bximisc_file_map(const char * filename,
             err2 = _create_writable_file(filename, size, &file);
             BXIERR_CHAIN(err, err2);
 
-            if (bxierr_isko(err)) return err;
+            if (bxierr_isko(err)){
+                TRACE(CINSTRU_MISC_LOGGER,"X");
+                return err;
+            }
             errno = 0;
             init_file_addr = mmap(NULL, size, MMAP_PROT,
                                   MAP_SHARED, file, 0);
@@ -643,19 +724,23 @@ bxierr_p bximisc_file_map(const char * filename,
                                              filename);
                 BXIERR_CHAIN(err, err2);
             }
+            TRACE(CINSTRU_MISC_LOGGER,"X");
             return err;
         }
     }
 
     if (MAP_FAILED == init_file_addr || NULL == init_file_addr) {
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return bxierr_errno("An error occured while mapping %s.", filename);
     }
 
     *addr = init_file_addr;
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
 bxierr_p bximisc_mkdtemp(char * tmp_name, char ** res) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, res != NULL);
     char * tmpdir = getenv("TMPDIR");
     if (tmpdir == NULL) {
@@ -670,12 +755,15 @@ bxierr_p bximisc_mkdtemp(char * tmp_name, char ** res) {
     if (*res == NULL) {
         bxierr_p err = bxierr_errno("mkdtemp can't handle the string %s", full_tmp_name);
         BXIFREE(full_tmp_name);
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return err;
     }
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
 bxierr_p bximisc_mkstemp(char * tmp_name, char ** res, int *fd) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, res != NULL);
     char * prefix="bxi";
     if (tmp_name != NULL) {
@@ -690,6 +778,7 @@ bxierr_p bximisc_mkstemp(char * tmp_name, char ** res, int *fd) {
     if (rc == -1) {
         bxierr_p err = bxierr_errno("mkstemp can't handle the string %s", full_tmp_name);
         BXIFREE(full_tmp_name);
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return err;
     }
     if (fd != NULL) {
@@ -700,10 +789,12 @@ bxierr_p bximisc_mkstemp(char * tmp_name, char ** res, int *fd) {
             bxierr_p err = bxierr_errno("close error on file descriptor %d for file %s",
                                         fd, full_tmp_name);
             BXIFREE(full_tmp_name);
+            TRACE(CINSTRU_MISC_LOGGER,"X");
             return err;
         }
     }
     *res = full_tmp_name;
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
@@ -712,10 +803,12 @@ bxierr_p bximisc_mkstemp(char * tmp_name, char ** res, int *fd) {
 // *********************************************************************************
 
 bxierr_p _create_writable_file(const char * filename, size_t size, int *fd) {
+    TRACE(CINSTRU_MISC_LOGGER,"E");
     BXIASSERT(BXIMISC_LOGGER, fd != NULL);
     errno = 0;
     *fd = open(filename, O_CREAT|O_RDWR|O_EXCL,  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     if (*fd == -1){
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return bxierr_errno("Can't open %s", filename);
     }
 
@@ -728,6 +821,7 @@ bxierr_p _create_writable_file(const char * filename, size_t size, int *fd) {
                                          *fd, filename);
             BXIERR_CHAIN(err, err2);
         }
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return err;
 
     }
@@ -741,8 +835,10 @@ bxierr_p _create_writable_file(const char * filename, size_t size, int *fd) {
                                          *fd, filename);
             BXIERR_CHAIN(err, err2);
         }
+        TRACE(CINSTRU_MISC_LOGGER,"X");
         return err;
     }
+    TRACE(CINSTRU_MISC_LOGGER,"X");
     return BXIERR_OK;
 }
 
